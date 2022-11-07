@@ -15,3 +15,7 @@ How to pull new work:
 1. if you want to stash your work type `git stash`
 2. if you dont want to save the work (want to delete it) type `git checkout <name of file>`
 3. type `git pull`
+
+<img width="515" alt="image" src="https://user-images.githubusercontent.com/95138958/200343908-0b5003b7-29c2-443a-b106-09d4cc0a7023.png">
+<img width="529" alt="image" src="https://user-images.githubusercontent.com/95138958/200344025-a3b22f7d-8bc5-4388-82a3-b9b082fd78c9.png">
+<img width="497" alt="image" src="https://user-images.githubusercontent.com/95138958/200344207-9bba1e04-7b4c-4e40-909f-ecf6ea5a129d.png">
