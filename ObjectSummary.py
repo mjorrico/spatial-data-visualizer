@@ -78,7 +78,7 @@ class ObjectSummary:
 
     def show(self, user: int):
         os = {"user": user}
-        os["friends"] = self.get_friends(user)
+        os["friends"] = self.get_friends(user)["friends"]
         checkins = deepcopy(self.get_checkins(user)["checkins"])
         for d in checkins:
             place_info = self.place_info[d["placeid"]]
