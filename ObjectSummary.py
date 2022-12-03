@@ -5,6 +5,11 @@ import networkx as nx
 import datetime
 
 
+def jaccard(seq1, seq2):
+    set1, set2 = set(seq1), set(seq2)
+    return len(set1 & set2) / float(len(set1 | set2))
+
+
 class ObjectSummary:
     def __init__(self) -> None:
         self.graph = nx.Graph()

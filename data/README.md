@@ -1,7 +1,7 @@
 
 # Dataset Directory
 
-All datasets are to be places here. Gowalla datasets can be obtained 
+All datasets are to be placed here. Gowalla datasets can be obtained 
 here [[E. Cho, 2011]](https://snap.stanford.edu/data/loc-gowalla.html). 
 Both checkins and friends network dataset must be renamed to `checkins.txt` 
 and `friends.txt` respectively.
