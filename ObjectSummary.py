@@ -81,15 +81,19 @@ class ObjectSummary:
         output["placeid"] = placeid
         return output
 
-    def show(self, user: int):
+    def show(self, user: int, as_json: bool = False):
         os = {"user": user}
         os["friends"] = self.get_friends(user)["friends"]
-        checkins = deepcopy(self.get_checkins(user)["checkins"])
-        for d in checkins:
-            place_info = self.place_info[d["placeid"]]
-            d["visitors"] = place_info["users"]
-            d["lat"] = place_info["lat"]
-            d["lng"] = place_info["lng"]
-            d["time"] = d["time"].strftime("%d-%M-%Y %H:%m:%s")
-        os["checkedin_at"] = checkins
+        os["checkedin_at"] = [
+            {
+                "placeid": p["placeid"],
+                "time": p["time"].strftime("%d-%M-%Y %H:%m:%s")
+                if as_json
+                else p["time"],
+                "visitors": self.place_info[p["placeid"]]["users"],
+                "lat": self.place_info[p["placeid"]]["lat"],
+                "lng": self.place_info[p["placeid"]]["lng"],
+            }
+            for p in self.get_checkins(user)["checkins"]
+        ]
         return os
