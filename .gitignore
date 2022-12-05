@@ -2,7 +2,8 @@
 .vscode
 faiss_tutorial.ipynb
 Untitled.ipynb
-data/checkins.txt
-data/friends.txt
+*.txt
 __pycache__
 pdfs/
+sandbox.py
+sandbox.ipynb
