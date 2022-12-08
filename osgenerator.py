@@ -79,7 +79,7 @@ class OSGenerator:
         }
 
     def get_visitor(self, placeid: int):
-        return list(self.graph.neighbors(1946746))
+        return list(self.graph.neighbors(placeid))
 
     def get_object_summary(self, user: int, prettify: bool = False):
         os = {"user": user}
