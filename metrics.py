@@ -1,3 +1,6 @@
+import numpy as np
+
+
 def jaccard(seq1, seq2):
     set1, set2 = set(seq1), set(seq2)
     return len(set1 & set2) / float(len(set1 | set2))
@@ -8,13 +11,16 @@ def overlap_coeff(seq1, seq2):
     return len(set1 & set2) / min(len(set1), len(set2))
 
 
-if __name__ == "__main__":
-    s1 = [1, 2, 3, 4]
-    s2 = [2, 3, 4, 5]
-    print(jaccard(s1, s2))
-    print(overlap_coeff(s1, s2))
+def haversine(lat1, lon1, lat2, lon2):
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
 
-    s1 = [2, 3, 4]
-    s2 = [2, 3, 4, 5, 1]
-    print(jaccard(s1, s2))
-    print(overlap_coeff(s1, s2))
+    a = (
+        np.sin(dlat / 2.0) ** 2
+        + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0) ** 2
+    )
+    c = 2 * np.arcsin(np.sqrt(a))
+    km = 6371 * c
+
+    return km

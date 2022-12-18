@@ -3,6 +3,7 @@
 faiss_tutorial.ipynb
 Untitled.ipynb
 *.txt
+*.csv
 __pycache__
 pdfs/
 sandbox.py
