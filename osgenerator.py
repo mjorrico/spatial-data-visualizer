@@ -129,7 +129,7 @@ class OSGenerator:
 
     def get_user_relevant_friend(self, user: int) -> pd.DataFrame:
         friends = np.array(self.get_user_friend(user))
-        n_friends = int((len(friends) + 0.5) ** (1 / 2))
+        n_friends = int((len(friends) + 0.5) ** (1 / 3))
         np.random.shuffle(friends)
         friend_similarity_scores = np.array(
             [
@@ -179,6 +179,16 @@ class OSGenerator:
     def get_user_place(self, user):
         places = self.get_user_checkin(user)["place_id"].tolist()
         return self.df_places[self.df_places["place_id"].isin(places)]
+
+    def get_relevant_place(self, user):
+        df_direct_visit = self.get_user_place(user)
+        selected_friends = self.get_user_relevant_friend(user)[
+            "friend_id"
+        ].to_list()
+        df_friend_visit = self.get_user_place(selected_friends)
+        return pd.concat(
+            (df_direct_visit, df_friend_visit), ignore_index=True
+        ).drop_duplicates("place_id")
 
     def get_place_info(self, placeid: int):  # ok
         return self.df_places[self.df_places["place_id"] == placeid]
