@@ -127,6 +127,32 @@ class OSGenerator:
             .tolist()
         )
 
+    def get_user_relevant_friend(self, user: int) -> pd.DataFrame:
+        friends = np.array(self.get_user_friend(user))
+        n_friends = int((len(friends) + 0.5) ** (1 / 2))
+        np.random.shuffle(friends)
+        friend_similarity_scores = np.array(
+            [
+                jaccard(
+                    friends.tolist() + [user],
+                    self.get_user_friend(friend_id) + [friend_id],
+                )
+                for friend_id in friends
+            ]
+        )
+        ranked_sim_index = np.argsort(friend_similarity_scores)[-n_friends:]
+        selected_friends = friends[ranked_sim_index]
+        selected_scores = np.array(friend_similarity_scores)[ranked_sim_index]
+        df_friend = pd.DataFrame()
+        df_friend["user_id"] = [user] * len(selected_friends)
+        df_friend["friend_id"] = selected_friends
+        df_friend["similarity"] = selected_scores
+        df_friend = df_friend.sort_values(
+            "similarity", ascending=False, ignore_index=True
+        )
+
+        return df_friend
+
     def get_visitor(self, placeid: int):  # ok
         if placeid not in self.df_places["place_id"]:
             raise KeyError(f"Place {placeid} cannot be found.")
@@ -160,26 +186,7 @@ class OSGenerator:
     def get_object_summary(self, user: int):
         df_user = pd.DataFrame([user], columns=["user_id"])
 
-        friends = np.array(self.get_user_friend(user))
-        n_friends = int((len(friends) + 0.5) ** (1 / 2))
-        np.random.shuffle(friends)
-        friend_similarity_scores = np.array(
-            [
-                jaccard(
-                    friends.tolist() + [user],
-                    self.get_user_friend(friend_id) + [friend_id],
-                )
-                for friend_id in friends
-            ]
-        )
-        ranked_sim_index = np.argsort(friend_similarity_scores)[-n_friends:]
-        selected_friends = friends[ranked_sim_index]
-        selected_scores = np.array(friend_similarity_scores)[ranked_sim_index]
-        df_friend = pd.DataFrame()
-        df_friend["user_id"] = [user] * len(selected_friends)
-        df_friend["friend_id"] = selected_friends
-        df_friend["similarity"] = selected_scores
-        df_friend = df_friend.sort_values("similarity", ascending=False)
+        df_friend = self.get_user_relevant_friend(user)
 
         places = self.get_user_checkin(user)["place_id"].unique().tolist()
         df_location = self.df_places[self.df_places["place_id"].isin(places)]

@@ -24,3 +24,18 @@ def haversine(lat1, lon1, lat2, lon2):
     km = 6371 * c
 
     return km
+
+
+def fast_jaccard(vec: np.ndarray, mat: np.ndarray):
+    # vec 1xN
+    # mat MxN
+
+    # output: jaccard_list 1xM
+    vec = vec.reshape((1, -1)).astype(bool).astype(int)
+    mat = mat.astype(bool).astype(int)
+    intersect = vec.dot(mat.T)
+    sum_vec = vec.sum(1)
+    sum_mat = mat.sum(1)
+    union = vec.sum(1) + mat.sum(1) - intersect
+
+    return (intersect / union).reshape(-1)
