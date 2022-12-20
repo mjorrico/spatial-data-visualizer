@@ -6,5 +6,6 @@ Untitled.ipynb
 *.csv
 __pycache__
 pdfs/
+cache/
 sandbox.py
 sandbox.ipynb
