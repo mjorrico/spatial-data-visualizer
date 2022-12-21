@@ -1,12 +1,17 @@
 from metrics import jaccard, overlap_coeff
-from datetime import datetime
-from tqdm import tqdm
-from math import sqrt
+from copy import deepcopy
 
-import networkx as nx
 import pandas as pd
 import numpy as np
 import re
+
+
+def aggregate_to_list(df, key_col, value_col) -> pd.Series:
+    new_df = df[[key_col, value_col]].drop_duplicates()
+    keys, values = new_df.sort_values(key_col).values.T
+    ukeys, index = np.unique(keys, True)
+    arrays = np.split(values, index[1:])
+    return ukeys, [list(set(a)) for a in arrays]
 
 
 class OS:
@@ -118,31 +123,44 @@ class OSGenerator:
         self.df_places = pd.read_csv(filepath_to_places)
         self.df_countries = pd.read_csv(filepath_to_countries)
 
-    def get_user_friend(self, user: int) -> pd.Series:  # ok
-        if user not in self.df_friends["user_id"]:
-            raise KeyError(f"User {user} cannot be found.")
-        return (
-            self.df_friends[self.df_friends["user_id"] == user]["friend_id"]
-            .unique()
-            .tolist()
-        )
+    def get_user_friend(self, user) -> pd.Series:  # ok
+        if isinstance(user, int):
+            user = [user]
+        elif not isinstance(user, list):
+            raise TypeError("User must be int or list of int")
+        else:
+            user = list(set(user))
+
+        is_user_exist_list = pd.Series(user).isin(self.df_friends["user_id"])
+        if not all(is_user_exist_list):
+            failed_idx = is_user_exist_list.argmin()
+            raise ValueError(f"User {user[failed_idx]} doesn't exist")
+
+        df_filtered = self.df_friends[self.df_friends["user_id"].isin(user)]
+        keys, values = aggregate_to_list(df_filtered, "user_id", "friend_id")
+        return pd.Series(values, keys)
 
     def get_user_relevant_friend(self, user: int) -> pd.DataFrame:
-        friends = np.array(self.get_user_friend(user))
-        n_friends = int((len(friends) + 0.5) ** (1 / 3))
-        np.random.shuffle(friends)
-        friend_similarity_scores = np.array(
-            [
-                jaccard(
-                    friends.tolist() + [user],
-                    self.get_user_friend(friend_id) + [friend_id],
-                )
-                for friend_id in friends
-            ]
-        )
-        ranked_sim_index = np.argsort(friend_similarity_scores)[-n_friends:]
-        selected_friends = friends[ranked_sim_index]
-        selected_scores = np.array(friend_similarity_scores)[ranked_sim_index]
+        user_friend = self.get_user_friend(user)[user]
+        friend_of_user_friend = self.get_user_friend(user_friend)
+
+        similarity_scores = []
+        similarity_id = []
+        for f in friend_of_user_friend.items():
+            j_val = jaccard(user_friend + [user], f[1] + [f[0]])
+            similarity_scores.append(j_val)
+            similarity_id.append(f[0])
+
+        idx_shuffle = np.arange(len(similarity_id))
+        np.random.shuffle(idx_shuffle)
+        similarity_scores = np.array(similarity_scores)[idx_shuffle]
+        similarity_id = np.array(similarity_id)[idx_shuffle]
+
+        n_selected = int((len(user_friend) + 0.5) ** (1 / 3))
+        selected_index = np.argsort(similarity_scores)[-n_selected:]
+        selected_friends = similarity_id[selected_index]
+        selected_scores = similarity_scores[selected_index]
+
         df_friend = pd.DataFrame()
         df_friend["user_id"] = [user] * len(selected_friends)
         df_friend["friend_id"] = selected_friends
@@ -153,16 +171,24 @@ class OSGenerator:
 
         return df_friend
 
-    def get_visitor(self, placeid: int):  # ok
-        if placeid not in self.df_places["place_id"].to_list():
-            raise KeyError(f"Place {placeid} cannot be found.")
-        return (
-            self.df_checkins[self.df_checkins["place_id"] == placeid][
-                "user_id"
-            ]
-            .unique()
-            .tolist()
-        )
+    def get_visitor(self, placeid):
+        if isinstance(placeid, int):
+            placeid = [placeid]
+        elif not isinstance(placeid, list):
+            raise TypeError("Function only accepts int or list as input")
+        else:
+            placeid = list(set(placeid))
+
+        is_place_exist = pd.Series(placeid).isin(self.df_places["place_id"])
+        if not all(is_place_exist):
+            failed_idx = is_place_exist.argmin()
+            raise KeyError(f"User {placeid[failed_idx]} doesn't exist")
+
+        df_filtered = self.df_checkins[
+            self.df_checkins["place_id"].isin(placeid)
+        ]
+        keys, values = aggregate_to_list(df_filtered, "place_id", "user_id")
+        return pd.Series(values, keys)
 
     def get_checkin_time(self, user: int, placeid: int):  # ok
         return self.df_checkins[
@@ -181,11 +207,19 @@ class OSGenerator:
         return self.df_places[self.df_places["place_id"].isin(places)]
 
     def get_relevant_place(self, user):
-        df_direct_visit = self.get_user_place(user)
+        df_direct_visit = deepcopy(self.get_user_place(user))
+        df_direct_visit["is_direct"] = [1] * len(df_direct_visit)
+
         selected_friends = self.get_user_relevant_friend(user)[
             "friend_id"
         ].to_list()
+
         df_friend_visit = self.get_user_place(selected_friends)
+        df_friend_visit = df_friend_visit[
+            ~df_friend_visit["place_id"].isin(df_direct_visit["place_id"])
+        ]
+        df_friend_visit["is_direct"] = [0] * len(df_friend_visit)
+
         return pd.concat(
             (df_direct_visit, df_friend_visit), ignore_index=True
         ).drop_duplicates("place_id")
@@ -195,20 +229,11 @@ class OSGenerator:
 
     def get_object_summary(self, user: int):
         df_user = pd.DataFrame([user], columns=["user_id"])
-
         df_friend = self.get_user_relevant_friend(user)
-
-        places = self.get_user_checkin(user)["place_id"].unique().tolist()
-        df_location = self.df_places[self.df_places["place_id"].isin(places)]
-
-        df_checkin = self.df_checkins[
-            (self.df_checkins["user_id"] == user)
-            & (self.df_checkins["place_id"].isin(places))
-        ]
-
-        countries = df_location["country_id"].unique().tolist()
+        df_location = self.get_user_place(user)
+        df_checkin = self.get_user_checkin(user)
         df_countries = self.df_countries[
-            self.df_countries["country_id"].isin(countries)
+            self.df_countries["country_id"].isin(df_location["country_id"])
         ]
 
         return OS(df_user, df_friend, df_checkin, df_location, df_countries)
