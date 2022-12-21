@@ -17,6 +17,9 @@ osgen.read_from_file(
     "data/countries.csv",
 )
 
+DiskcacheManager()
+
+
 layout = html.Div(
     [
         dcc.Input(
@@ -30,18 +33,8 @@ layout = html.Div(
             n_clicks=0,
         ),
         html.Button(
-            "Cancel Search",
-            id="cancel-generate-button",
-            n_clicks=0,
-        ),
-        html.Button(
-            "Show user info",
+            "Search This Area",
             id="user-info-button",
-            n_clicks=0,
-        ),
-        html.Button(
-            "Show on map",
-            id="map-button",
             n_clicks=0,
         ),
         html.Br(),
@@ -55,19 +48,28 @@ layout = html.Div(
                 dl.Map(
                     [dl.TileLayer(), dl.LayerGroup(id="layer")],
                     id="map",
-                    style={"width": "600px", "height": "400px", "flex": 1},
+                    style={"flex": 1},
                 ),
                 html.Div(
-                    html.Pre(id="os-string"),
+                    html.Pre(id="os-string", style={"font-size": 15}),
                     id="user-info",
-                    style={"flex": 1, "overflow": "auto"},
+                    style={
+                        "overflow": "auto",
+                        "width": "500px",
+                        "margin": "10px",
+                    },
                 ),
             ],
-            style={"display": "flex", "flex-direction": "row"},
+            style={
+                "display": "flex",
+                "flex-direction": "row",
+                "height": "500px",
+            },
         ),
         html.P(id="text-coords"),
         # Data Storage
         dcc.Store(id="place-storage"),
+        dcc.Store(id="visitor-storage"),
     ]
 )
 
@@ -91,14 +93,31 @@ app.layout = layout
     background=True,
     running=[
         (Output("user-info-button", "disabled"), True, False),
+        (Output("generate-places-button", "disabled"), True, False),
     ],
 )
 def load_os(n_clicks, value):
     if value not in osgen.df_friends["user_id"]:
         raise PreventUpdate
+
+    print(value)
+
     places = osgen.get_relevant_place(value)
-    # os_string = osgen.get_object_summary(value)
-    os_string = "a"
+    os_string = osgen.get_object_summary(value)
+
+    for t in places.itertuples():
+        print(t.place_id)
+        print(type(t.place_id))
+        break
+
+    d_visitor = {
+        t.place_id: osgen.get_visitor(t.place_id) for t in places.itertuples()
+    }
+    for i, k in enumerate(d_visitor.keys()):
+        print(k, d_visitor[k])
+        if i == 5:
+            break
+
     return [
         (places.reset_index().to_json(orient="split")),
         (f"Selected user: {value}"),
@@ -116,15 +135,17 @@ def load_os(n_clicks, value):
         State("map", "bounds"),
     ],
     prevent_initial_call=True,
-    background=True,
     running=[
         (Output("user-info-button", "disabled"), True, False),
+        (Output("generate-places-button", "disabled"), True, False),
     ],
 )
 def display_os_on_map(n_clicks, data, bounds):
     if data is None:
         raise PreventUpdate
+
     [lat1, lon1], [lat2, lon2] = bounds
+
     df_places = pd.read_json(data, orient="split")[
         ["place_id", "lat", "lon", "country_id"]
     ].astype(
@@ -135,17 +156,19 @@ def display_os_on_map(n_clicks, data, bounds):
             "country_id": int,
         }
     )
-    coordinates = df_places.iloc[:, :3].to_numpy()
+    df_places = df_places[
+        (df_places.lat.between(lat1, lat2))
+        & (df_places.lon.between(lon1, lon2))
+    ]
+
+    print(np.random.randint(0, 1000, (3, 3)))
+    N = min(10, len(df_places))
+    coordinates = df_places.sample(N).iloc[:, :3].to_numpy()
     points = [
         dl.Marker(position=[lat, lon], children=dl.Tooltip(f"{int(id)}"))
         for id, lat, lon in coordinates
     ]
     return [(points)]
-
-
-@app.callback(Output("text-coords", "children"), Input("map", "bounds"))
-def log_bounds(bounds):
-    return json.dumps(bounds)
 
 
 if __name__ == "__main__":

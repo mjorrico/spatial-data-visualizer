@@ -154,7 +154,7 @@ class OSGenerator:
         return df_friend
 
     def get_visitor(self, placeid: int):  # ok
-        if placeid not in self.df_places["place_id"]:
+        if placeid not in self.df_places["place_id"].to_list():
             raise KeyError(f"Place {placeid} cannot be found.")
         return (
             self.df_checkins[self.df_checkins["place_id"] == placeid][

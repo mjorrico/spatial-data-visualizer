@@ -3,7 +3,9 @@ import numpy as np
 
 def jaccard(seq1, seq2):
     set1, set2 = set(seq1), set(seq2)
-    return len(set1 & set2) / float(len(set1 | set2))
+    n_intersect = len(set1 & set2)
+    n_union = len(seq1) + len(seq2) - n_intersect
+    return n_intersect / n_union
 
 
 def overlap_coeff(seq1, seq2):
