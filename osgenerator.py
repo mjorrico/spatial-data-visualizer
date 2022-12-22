@@ -206,7 +206,7 @@ class OSGenerator:
         places = self.get_user_checkin(user)["place_id"].tolist()
         return self.df_places[self.df_places["place_id"].isin(places)]
 
-    def get_relevant_place(self, user):
+    def get_relevant_place(self, user, with_visitor=False):
         df_direct_visit = deepcopy(self.get_user_place(user))
         df_direct_visit["is_direct"] = [1] * len(df_direct_visit)
 
@@ -220,9 +220,26 @@ class OSGenerator:
         ]
         df_friend_visit["is_direct"] = [0] * len(df_friend_visit)
 
-        return pd.concat(
+        df_places = pd.concat(
             (df_direct_visit, df_friend_visit), ignore_index=True
         ).drop_duplicates("place_id")
+
+        if with_visitor:
+            s_visitor = self.get_visitor(df_places["place_id"].to_list())
+
+            n_visitor_list = []
+            for pid in df_places["place_id"]:
+                n_visitor_list.append(len(s_visitor[pid]))
+            df_places["weight"] = np.array(n_visitor_list) / (
+                np.array(n_visitor_list) + 10
+            )
+            return (
+                df_places,
+                s_visitor,
+            )
+
+        else:
+            return df_places
 
     def get_place_info(self, placeid: int):  # ok
         return self.df_places[self.df_places["place_id"] == placeid]
