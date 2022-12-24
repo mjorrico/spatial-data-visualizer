@@ -235,7 +235,7 @@ class OSGenerator:
             )
             return (
                 df_places,
-                s_visitor,
+                dict(s_visitor),
             )
 
         else:
