@@ -26,8 +26,3 @@ def haversine(lat1, lon1, lat2, lon2):
     km = 6371 * c
 
     return km
-
-
-def object_weight(arr):
-    arr = np.array(arr)
-    return arr / (arr + 10)

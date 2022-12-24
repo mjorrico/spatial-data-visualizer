@@ -230,6 +230,7 @@ class OSGenerator:
             n_visitor_list = []
             for pid in df_places["place_id"]:
                 n_visitor_list.append(len(s_visitor[pid]))
+
             df_places["weight"] = np.array(n_visitor_list) / (
                 np.array(n_visitor_list) + 10
             )

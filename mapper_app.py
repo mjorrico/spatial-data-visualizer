@@ -17,15 +17,13 @@ osgen.read_from_file(
     "data/countries.csv",
 )
 
-DiskcacheManager()
-
 
 layout = html.Div(
     [
         dcc.Input(
             id="textbox-user",
             type="number",
-            # placeholder="Enter user ID",
+            placeholder="Enter user ID",
         ),
         html.Button(
             "Load Object Summary",
@@ -70,24 +68,28 @@ layout = html.Div(
         # Data Storage
         dcc.Store(id="place-storage"),
         dcc.Store(id="visitor-storage"),
+        dcc.Store(id="last-bounds"),
     ]
 )
 
 cache = diskcache.Cache("./cache")
-background_callback_manager = DiskcacheManager(cache)
-app = Dash(__name__, background_callback_manager=background_callback_manager)
+bcm = DiskcacheManager(cache)
+app = Dash(__name__, background_callback_manager=bcm)
 
 app.layout = layout
 
 
 @app.callback(
     output=[
-        (Output("place-storage", "data")),
         (Output("selected-user", "children")),
         (Output("os-string", "children")),
+        (Output("place-storage", "data")),
+        (Output("visitor-storage", "data")),
+        (Output("last-bounds", "data")),
     ],
     inputs=[
         (Input("generate-places-button", "n_clicks")),
+        (State("map", "bounds")),
         (State("textbox-user", "value")),
     ],
     background=True,
@@ -96,32 +98,19 @@ app.layout = layout
         (Output("generate-places-button", "disabled"), True, False),
     ],
 )
-def load_os(n_clicks, value):
+def load_os(n_clicks, bounds, value):
     if value not in osgen.df_friends["user_id"]:
         raise PreventUpdate
 
-    print(value)
-
-    places = osgen.get_relevant_place(value)
+    df_places, d_visitor = osgen.get_relevant_place(value)
     os_string = osgen.get_object_summary(value)
 
-    for t in places.itertuples():
-        print(t.place_id)
-        print(type(t.place_id))
-        break
-
-    d_visitor = {
-        t.place_id: osgen.get_visitor(t.place_id) for t in places.itertuples()
-    }
-    for i, k in enumerate(d_visitor.keys()):
-        print(k, d_visitor[k])
-        if i == 5:
-            break
-
     return [
-        (places.reset_index().to_json(orient="split")),
         (f"Selected user: {value}"),
         (str(os_string)),
+        (df_places.reset_index().to_json(orient="split")),
+        (d_visitor),
+        (bounds),
     ]
 
 
@@ -130,9 +119,11 @@ def load_os(n_clicks, value):
         (Output("layer", "children")),
     ],
     inputs=[
-        Input("user-info-button", "n_clicks"),
-        State("place-storage", "data"),
-        State("map", "bounds"),
+        (Input("user-info-button", "n_clicks")),
+        (State("map", "bounds")),
+        (State("place-storage", "data")),
+        (State("visitor-storage", "data")),
+        (State("last-bounds", "data")),
     ],
     prevent_initial_call=True,
     running=[
@@ -140,13 +131,15 @@ def load_os(n_clicks, value):
         (Output("generate-places-button", "disabled"), True, False),
     ],
 )
-def display_os_on_map(n_clicks, data, bounds):
-    if data is None:
+def display_os_on_map(
+    n_clicks, current_bounds, place_data, visitor_data, last_bounds
+):
+    if place_data is None:
         raise PreventUpdate
 
-    [lat1, lon1], [lat2, lon2] = bounds
+    [lat1, lon1], [lat2, lon2] = current_bounds
 
-    df_places = pd.read_json(data, orient="split")[
+    df_places = pd.read_json(place_data, orient="split")[
         ["place_id", "lat", "lon", "country_id"]
     ].astype(
         {
