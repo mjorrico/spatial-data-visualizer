@@ -5,6 +5,7 @@ import diskcache
 import pandas as pd
 import numpy as np
 from osgenerator import OSGenerator
+from sos import spatial_object_selection
 import json
 
 from time import sleep
@@ -27,12 +28,12 @@ layout = html.Div(
         ),
         html.Button(
             "Load Object Summary",
-            id="generate-places-button",
+            id="load-os-button",
             n_clicks=0,
         ),
         html.Button(
             "Search This Area",
-            id="user-info-button",
+            id="show-places-button",
             n_clicks=0,
         ),
         html.Br(),
@@ -68,7 +69,7 @@ layout = html.Div(
         # Data Storage
         dcc.Store(id="place-storage"),
         dcc.Store(id="visitor-storage"),
-        dcc.Store(id="last-bounds"),
+        dcc.Store(id="last-bounds-storage"),
     ]
 )
 
@@ -85,24 +86,24 @@ app.layout = layout
         (Output("os-string", "children")),
         (Output("place-storage", "data")),
         (Output("visitor-storage", "data")),
-        (Output("last-bounds", "data")),
+        (Output("last-bounds-storage", "data")),
     ],
     inputs=[
-        (Input("generate-places-button", "n_clicks")),
+        (Input("load-os-button", "n_clicks")),
         (State("map", "bounds")),
         (State("textbox-user", "value")),
     ],
     background=True,
     running=[
-        (Output("user-info-button", "disabled"), True, False),
-        (Output("generate-places-button", "disabled"), True, False),
+        (Output("show-places-button", "disabled"), True, False),
+        (Output("load-os-button", "disabled"), True, False),
     ],
 )
 def load_os(n_clicks, bounds, value):
     if value not in osgen.df_friends["user_id"]:
         raise PreventUpdate
 
-    df_places, d_visitor = osgen.get_relevant_place(value)
+    df_places, d_visitor = osgen.get_relevant_place(value, True)
     os_string = osgen.get_object_summary(value)
 
     return [
@@ -119,16 +120,16 @@ def load_os(n_clicks, bounds, value):
         (Output("layer", "children")),
     ],
     inputs=[
-        (Input("user-info-button", "n_clicks")),
+        (Input("show-places-button", "n_clicks")),
         (State("map", "bounds")),
         (State("place-storage", "data")),
         (State("visitor-storage", "data")),
-        (State("last-bounds", "data")),
+        (State("last-bounds-storage", "data")),
     ],
     prevent_initial_call=True,
     running=[
-        (Output("user-info-button", "disabled"), True, False),
-        (Output("generate-places-button", "disabled"), True, False),
+        (Output("show-places-button", "disabled"), True, False),
+        (Output("load-os-button", "disabled"), True, False),
     ],
 )
 def display_os_on_map(
@@ -154,14 +155,27 @@ def display_os_on_map(
         & (df_places.lon.between(lon1, lon2))
     ]
 
-    print(np.random.randint(0, 1000, (3, 3)))
     N = min(10, len(df_places))
     coordinates = df_places.sample(N).iloc[:, :3].to_numpy()
     points = [
         dl.Marker(position=[lat, lon], children=dl.Tooltip(f"{int(id)}"))
         for id, lat, lon in coordinates
     ]
+
+    spatial_object_selection(
+        df_places,
+        visitor_data,
+        last_bounds,
+        current_bounds,
+        10,
+    )
+
     return [(points)]
+
+
+@app.callback(Output("text-coords", "children"), Input("map", "bounds"))
+def show_border(bounds):
+    return str(bounds)
 
 
 if __name__ == "__main__":
