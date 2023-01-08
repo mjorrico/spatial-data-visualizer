@@ -5,7 +5,7 @@ import diskcache
 import pandas as pd
 import numpy as np
 from osgenerator import OSGenerator
-from sos import spatial_object_selection
+from object_selection import isos
 import json
 
 from time import sleep
@@ -69,7 +69,7 @@ layout = html.Div(
         # Data Storage
         dcc.Store(id="place-storage"),
         dcc.Store(id="visitor-storage"),
-        dcc.Store(id="last-bounds-storage"),
+        dcc.Store(id="last-bounds-storage", data=[[0, 0], [1, 1]]),
     ]
 )
 
@@ -86,11 +86,9 @@ app.layout = layout
         (Output("os-string", "children")),
         (Output("place-storage", "data")),
         (Output("visitor-storage", "data")),
-        (Output("last-bounds-storage", "data")),
     ],
     inputs=[
         (Input("load-os-button", "n_clicks")),
-        (State("map", "bounds")),
         (State("textbox-user", "value")),
     ],
     background=True,
@@ -99,7 +97,7 @@ app.layout = layout
         (Output("load-os-button", "disabled"), True, False),
     ],
 )
-def load_os(n_clicks, bounds, value):
+def load_os(n_clicks, value):
     if value not in osgen.df_friends["user_id"]:
         raise PreventUpdate
 
@@ -111,13 +109,13 @@ def load_os(n_clicks, bounds, value):
         (str(os_string)),
         (df_places.reset_index().to_json(orient="split")),
         (d_visitor),
-        (bounds),
     ]
 
 
 @app.callback(
     output=[
         (Output("layer", "children")),
+        (Output("last-bounds-storage", "data")),
     ],
     inputs=[
         (Input("show-places-button", "n_clicks")),
@@ -139,16 +137,21 @@ def display_os_on_map(
         raise PreventUpdate
 
     [lat1, lon1], [lat2, lon2] = current_bounds
+    [lat1p, lon1p], [lat2p, lon2p] = last_bounds
 
-    df_places = pd.read_json(place_data, orient="split")[
-        ["place_id", "lat", "lon", "country_id"]
-    ].astype(
-        {
-            "place_id": int,
-            "lat": np.float32,
-            "lon": np.float32,
-            "country_id": int,
-        }
+    df_places = (
+        pd.read_json(place_data, orient="split")
+        .iloc[:, 1:]
+        .astype(
+            {
+                "place_id": int,
+                "lat": np.float32,
+                "lon": np.float32,
+                "country_id": int,
+                "is_direct": int,
+                "weight": np.float32,
+            }
+        )
     )
     df_places = df_places[
         (df_places.lat.between(lat1, lat2))
@@ -156,13 +159,20 @@ def display_os_on_map(
     ]
 
     N = min(10, len(df_places))
-    coordinates = df_places.sample(N).iloc[:, :3].to_numpy()
+    selected = df_places.sample(N).to_numpy()
+
     points = [
-        dl.Marker(position=[lat, lon], children=dl.Tooltip(f"{int(id)}"))
-        for id, lat, lon in coordinates
+        dl.Marker(
+            position=[lat, lon],
+            children=dl.Tooltip(
+                f"user: {int(id)}",
+            ),
+            opacity=1 if is_direct else 0.5,
+        )
+        for id, lat, lon, _, is_direct, _ in selected
     ]
 
-    spatial_object_selection(
+    isos(
         df_places,
         visitor_data,
         last_bounds,
@@ -170,7 +180,7 @@ def display_os_on_map(
         10,
     )
 
-    return [(points)]
+    return [(points), (current_bounds)]
 
 
 @app.callback(Output("text-coords", "children"), Input("map", "bounds"))

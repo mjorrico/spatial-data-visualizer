@@ -15,7 +15,18 @@ import pandas as pd
 import numpy as np
 
 
-def spatial_object_selection(
+def greedy(
+    df_place: pd.DataFrame,
+    d_visitor: dict,
+    k: int,
+    min_distance: float,
+    S: list,
+    G: list,
+):
+    pass
+
+
+def isos(
     df_place: pd.DataFrame,
     d_visitor: dict,
     border_prev: list,
@@ -33,6 +44,8 @@ def spatial_object_selection(
         (df_place["lat"].between(lat1, lat2))
         & (df_place["lon"].between(lon1, lon2))
     ]  # selects objects located within current border
+
+    places_within_border = df_place["place_id"]
 
     is_zoomin = (lat1p < lat1 < lat2 < lat2p) & (lon1p < lon1 < lon2 < lon2p)
     is_zoomout = (lat1 < lat1p < lat2p < lat2) & (lon1 < lon1p < lon2p < lon2)
@@ -53,7 +66,7 @@ def spatial_object_selection(
             (~df_place["place_id"].isin(S)) & (~df_place["place_id"].isin(G))
         ]
 
-    print(df_place.head(5).to_numpy())
+    # sos_output = greedy()
 
 
 if __name__ == "__main__":
