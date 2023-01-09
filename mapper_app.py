@@ -5,7 +5,7 @@ import diskcache
 import pandas as pd
 import numpy as np
 from osgenerator import OSGenerator
-from object_selection import isos
+from object_selection import isos, random_selection
 import json
 
 from time import sleep
@@ -70,6 +70,8 @@ layout = html.Div(
         dcc.Store(id="place-storage"),
         dcc.Store(id="visitor-storage"),
         dcc.Store(id="last-bounds-storage", data=[[0, 0], [1, 1]]),
+        dcc.Store(id="last-unselected-objects", data=[]),
+        dcc.Store(id="last-selected-objects", data=[]),
     ]
 )
 
@@ -116,6 +118,8 @@ def load_os(n_clicks, value):
     output=[
         (Output("layer", "children")),
         (Output("last-bounds-storage", "data")),
+        (Output("last-selected-objects", "data")),
+        (Output("last-unselected-objects", "data")),
     ],
     inputs=[
         (Input("show-places-button", "n_clicks")),
@@ -123,6 +127,8 @@ def load_os(n_clicks, value):
         (State("place-storage", "data")),
         (State("visitor-storage", "data")),
         (State("last-bounds-storage", "data")),
+        (State("last-selected-objects", "data")),
+        (State("last-unselected-objects", "data")),
     ],
     prevent_initial_call=True,
     running=[
@@ -131,13 +137,16 @@ def load_os(n_clicks, value):
     ],
 )
 def display_os_on_map(
-    n_clicks, current_bounds, place_data, visitor_data, last_bounds
+    n_clicks,
+    current_bounds,
+    place_data,
+    visitor_data,
+    last_bounds,
+    displayed_objs,
+    undisplayed_objs,
 ):
     if place_data is None:
         raise PreventUpdate
-
-    [lat1, lon1], [lat2, lon2] = current_bounds
-    [lat1p, lon1p], [lat2p, lon2p] = last_bounds
 
     df_places = (
         pd.read_json(place_data, orient="split")
@@ -153,34 +162,38 @@ def display_os_on_map(
             }
         )
     )
-    df_places = df_places[
-        (df_places.lat.between(lat1, lat2))
-        & (df_places.lon.between(lon1, lon2))
-    ]
 
-    N = min(10, len(df_places))
-    selected = df_places.sample(N).to_numpy()
-
-    points = [
-        dl.Marker(
-            position=[lat, lon],
-            children=dl.Tooltip(
-                f"user: {int(id)}",
-            ),
-            opacity=1 if is_direct else 0.5,
-        )
-        for id, lat, lon, _, is_direct, _ in selected
-    ]
-
-    isos(
+    # selected = random_selection(df_places, current_bounds, 10)
+    new_selected, new_unselected = isos(
         df_places,
         visitor_data,
         last_bounds,
         current_bounds,
         10,
+        displayed_objs,
+        undisplayed_objs,
     )
+    a = 0
 
-    return [(points), (current_bounds)]
+    points = [
+        dl.Marker(
+            position=[lat, lon],
+            children=dl.Tooltip(
+                f"place_id: {int(id)}",
+            ),
+            opacity=1 if is_direct else 0.5,
+        )
+        for id, lat, lon, _, is_direct, _ in df_places[
+            df_places["place_id"].isin(new_selected)
+        ].itertuples(index=False)
+    ]
+
+    return [
+        (points),
+        (current_bounds),
+        (list(new_selected)),
+        (new_unselected),
+    ]
 
 
 @app.callback(Output("text-coords", "children"), Input("map", "bounds"))
