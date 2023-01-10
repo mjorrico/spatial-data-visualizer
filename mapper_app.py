@@ -6,9 +6,8 @@ import pandas as pd
 import numpy as np
 from osgenerator import OSGenerator
 from object_selection import isos, random_selection
-import json
 
-from time import sleep
+from time import time
 
 osgen = OSGenerator()
 osgen.read_from_file(
@@ -145,8 +144,11 @@ def display_os_on_map(
     displayed_objs,
     undisplayed_objs,
 ):
+    start = time()
     if place_data is None:
         raise PreventUpdate
+
+    visitor_data = {int(k): visitor_data[k] for k in visitor_data.keys()}
 
     df_places = (
         pd.read_json(place_data, orient="split")
@@ -163,7 +165,9 @@ def display_os_on_map(
         )
     )
 
-    # selected = random_selection(df_places, current_bounds, 10)
+    # new_selected, new_unselected = random_selection(
+    #     df_places, current_bounds, 10
+    # )
     new_selected, new_unselected = isos(
         df_places,
         visitor_data,
@@ -173,7 +177,6 @@ def display_os_on_map(
         displayed_objs,
         undisplayed_objs,
     )
-    a = 0
 
     points = [
         dl.Marker(
@@ -188,11 +191,13 @@ def display_os_on_map(
         ].itertuples(index=False)
     ]
 
+    print(f"Time elapsed: {time()-start}")
+
     return [
         (points),
         (current_bounds),
         (list(new_selected)),
-        (new_unselected),
+        (list(new_unselected)),
     ]
 
 
@@ -203,3 +208,5 @@ def show_border(bounds):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+
+x = 1

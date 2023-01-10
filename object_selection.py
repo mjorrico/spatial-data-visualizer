@@ -24,8 +24,9 @@ def random_selection(df_place: pd.DataFrame, bound: list, k: int):
 
     N = min(k, len(df_place))
     selected = df_place["place_id"].sample(N).to_numpy()
+    unselected = [pid for pid in df_place.place_id if pid not in selected]
 
-    return selected
+    return (selected, unselected)
 
 
 def greedy_sos(
@@ -37,14 +38,59 @@ def greedy_sos(
     S: list,
     G: list,
 ):
-    df_maxheap["score"] = [
+    df_maxheap["score_diff"] = [
         set_sim(df_all_places, S + [pid], d_visitor)
         for pid in df_maxheap.place_id
     ]
     df_maxheap["iter"] = [len(S)] * len(df_maxheap)
     df_maxheap = df_maxheap.sort_values(
-        "score", ignore_index=True, ascending=False
+        "score_diff", ignore_index=True, ascending=False
     )
+
+    while len(S) < k and len(df_maxheap) > 0:
+        top = df_maxheap.iloc[:1, :].copy().reset_index(drop=True)
+        df_maxheap = df_maxheap.iloc[1:, :]
+
+        while top.loc[0, "iter"] != len(S):
+            top.loc[0, "score_diff"] = (
+                set_sim(df_all_places, S + [top.loc[0, "place_id"]], d_visitor)
+                - top.loc[0, "score_diff"]
+            )
+            top.loc[0, "iter"] = len(S)
+
+            try:
+                insert_idx = next(
+                    i
+                    for i, v in enumerate(df_maxheap.score_diff.to_list())
+                    if v >= top.loc[0, "score_diff"]
+                )
+            except StopIteration:
+                insert_idx = len(df_maxheap)
+
+            try:
+                df_maxheap = pd.concat(
+                    [
+                        df_maxheap.iloc[:insert_idx, :],
+                        top,
+                        df_maxheap.iloc[insert_idx:, :],
+                    ]
+                )
+            except pd.errors.InvalidIndexError:
+                print(insert_idx)
+
+            top = df_maxheap.iloc[:1, :].copy().reset_index(drop=True)
+            df_maxheap = df_maxheap.iloc[1:, :]
+
+        S.append(top.loc[0, "place_id"])
+
+        lat2 = df_maxheap["lat"].to_numpy()
+        lon2 = df_maxheap["lon"].to_numpy()
+        lat1 = [top.loc[0, "lat"]] * len(df_maxheap)
+        lon1 = [top.loc[0, "lon"]] * len(df_maxheap)
+        is_kept = haversine(lat1, lon1, lat2, lon2) > min_distance
+        df_maxheap = df_maxheap[is_kept]
+
+    return S
 
 
 def isos(
@@ -59,7 +105,7 @@ def isos(
     [lat1, lon1], [lat2, lon2] = border_now  # [bottom left] [upper right]
     [lat1p, lon1p], [lat2p, lon2p] = border_prev
 
-    separation_distance = haversine(lat1, lon1, lat2, lon1) / 10  # width / 10
+    separation_distance = haversine(lat1, lon1, lat2, lon1) * 0.1  # width / 10
 
     is_zoomin = (lat1p < lat1 < lat2 < lat2p) & (lon1p < lon1 < lon2 < lon2p)
     is_zoomout = (lat1 < lat1p < lat2p < lat2) & (lon1 < lon1p < lon2p < lon2)
@@ -72,11 +118,10 @@ def isos(
         ["place_id", "lat", "lon", "weight"]
     ]  # selects objects located within current border
 
-    df_all_places = df_maxheap[["place_id", "weight"]]
+    df_all_places = df_maxheap[["place_id", "weight"]].copy()
     df_maxheap = df_maxheap.drop("weight", axis="columns")
-    if len(df_all_places) <= k:
-        print("Shortcut triggered")
-        return (df_all_places.place_id.to_list(), [])
+
+    print(len(df_all_places))
 
     if is_zoomin:
         S = [d for d in D if d in df_maxheap["place_id"]]
@@ -93,31 +138,24 @@ def isos(
             (~df_maxheap["place_id"].isin(S))
             & (~df_maxheap["place_id"].isin(G))
         ]
-    else:
-        raise SyntaxError("Map interaction type is not known...")
 
-    if all([s in D for s in S]) and all([d in S for d in D]):
-        print("Showing same points")
-        return (S, [pid for pid in df_all_places.place_id if pid not in S])
-    elif len(S) > k:
-        raise RuntimeError("This isn't supposed to happen")
+    # if len(S) + len(df_maxheap) <= k:
+    #     print("Shortcut triggered")
+    #     return (S + df_maxheap.place_id.to_list(), [])
+    # elif len(S) > k:
+    #     raise RuntimeError("This isn't supposed to happen")
 
-    selected = greedy_sos(
+    new_S = greedy_sos(
         df_maxheap, df_all_places, d_visitor, 10, separation_distance, S, G
     )
 
-    return (df_all_places.sample(min(10, len(df_all_places)))["place_id"], [])
-
-
-if __name__ == "__main__":
-    pass
+    return (new_S, [pid for pid in df_all_places.place_id if pid not in new_S])
 
 
 def obj_sim(obj: int, list_of_objs: list[int], visitors: dict):
-    N = len(list_of_objs)
+    visitor_obj = visitors[obj]
     jaccard_vals = [
-        jaccard(visitors[str(obj)], visitors[str(list_of_objs[i])])
-        for i in range(N)
+        jaccard(visitor_obj, visitors[s_obj]) for s_obj in list_of_objs
     ]
     return np.max(jaccard_vals)
 
