@@ -145,6 +145,9 @@ def display_os_on_map(
     undisplayed_objs,
 ):
     start = time()
+    print(f"displayed places: {displayed_objs}")
+    print(f"# hidden places: {len(undisplayed_objs)}")
+
     if place_data is None:
         raise PreventUpdate
 
@@ -165,9 +168,7 @@ def display_os_on_map(
         )
     )
 
-    # new_selected, new_unselected = random_selection(
-    #     df_places, current_bounds, 10
-    # )
+    start = time()
     new_selected, new_unselected = isos(
         df_places,
         visitor_data,
@@ -191,7 +192,9 @@ def display_os_on_map(
         ].itertuples(index=False)
     ]
 
-    print(f"Time elapsed: {time()-start}")
+    print(f"Time elapsed: {np.round(time()-start, 2)} second(s)")
+    print(f"selected points: {new_selected}")
+    print()
 
     return [
         (points),
@@ -208,5 +211,5 @@ def show_border(bounds):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
-
-x = 1
+    a = 12
+    # 254891 9259 9066

@@ -1,52 +1,58 @@
 import numpy as np
+from metrics import haversine, euclidean
 
 
-class Maxheap(object):
-    def __init__(self):
-        self.head = None
+class Maxheap:
+    def __init__(self, id, lat, lon, gain, iter):
+        sort_idx = np.argsort(gain)[::-1]
 
-    def insert(self, node: "Node"):
-        if self.head is None:
-            self.head = node
-        elif node.score_gain >= self.head.score_gain:
-            node.child = self.head
-            self.head = node
-        else:
-            heap_node = self.head
-            while heap_node is not None:
-                if (
-                    heap_node.child is None
-                    or node.score_gain >= heap_node.child.score_gain
-                ):
-                    node.child = heap_node.child
-                    heap_node.child = node
-                    break
-                heap_node = heap_node.child
+        self.float_stack = np.array([lat, lon, gain], dtype=np.float32).T
+        self.int_stack = np.array([id, iter], dtype=np.int32).T  # place_id
+
+        self.float_stack = self.float_stack[sort_idx]
+        self.int_stack = self.int_stack[sort_idx]
+
+    def __repr__(self):
+        n = min(len(self), 40)
+        return str(
+            np.concatenate(
+                [self.int_stack[:n], self.float_stack[:n, :]],
+                axis=1,
+            )
+        )
+
+    def __len__(self):
+        return len(self.int_stack)
 
     def poptop(self):
-        if self.head is not None:
-            top_node = self.head.copy()
-            self.head = self.head.child
-            return top_node
+        top = (self.int_stack[:1, :], self.float_stack[:1, :])
+        self.int_stack = self.int_stack[1:, :]
+        self.float_stack = self.float_stack[1:, :]
+        return top
 
-    def __repr__(self):
-        output = []
-        heap_node = self.head
-        while heap_node is not None:
-            output.append(str(heap_node))
-            heap_node = heap_node.child
-        return "\n".join(output)
+    def insert(self, int_arr, float_arr):
+        if len(self.float_stack) == 0:
+            insert_idx = 0
+        elif self.float_stack[-1, 2] > float_arr[0, 2]:
+            insert_idx = len(self)
+        else:
+            insert_idx = np.argmax(self.float_stack[:, 2] < float_arr[0, 2])
 
+        self.int_stack = np.insert(self.int_stack, insert_idx, int_arr, 0)
+        self.float_stack = np.insert(
+            self.float_stack, insert_idx, float_arr, 0
+        )
 
-class Node:
-    def __init__(self, obj_id, score_gain, iter) -> None:
-        self.obj_id = obj_id
-        self.score_gain = score_gain
-        self.iter = iter
-        self.child: Node = None
+    def delete(self, arr):
+        keep_idx = ~np.isin(self.int_stack[:, 0], arr)
+        self.int_stack = self.int_stack[keep_idx]
+        self.float_stack = self.float_stack[keep_idx]
 
-    def copy(self):
-        return Node(self.obj_id, self.score_gain, self.iter)
+    def delete_neighbors(self, lat, lon, radius):
+        stack_lat = self.float_stack[:, 0]
+        stack_lon = self.float_stack[:, 1]
 
-    def __repr__(self):
-        return f"{[self.obj_id, self.score_gain, self.iter]}"
+        index_keep = euclidean(lat, lon, stack_lat, stack_lon) > radius
+
+        self.int_stack = self.int_stack[index_keep]
+        self.float_stack = self.float_stack[index_keep]

@@ -26,3 +26,7 @@ def haversine(lat1, lon1, lat2, lon2):
     km = 6371 * c
 
     return km
+
+
+def euclidean(lat1, lon1, lat2, lon2):
+    return np.sqrt(np.power(lat1 - lat2, 2) + np.power(lon1 - lon2, 2))
