@@ -11,7 +11,7 @@ A paradigm of spatial information retrieval and visualization using Object Summa
   cd mastersproject
 ```
 
-2. Download test data (4 files) and put it under `data/`
+2. Download test [data](https://uppsalauniversitet-my.sharepoint.com/:f:/g/personal/misaeljordan_enrico_6037_student_uu_se/EmroTZTnO9dGiF3Zz_OB_hwBTHM-weFzmNCnpNwI3Bh9Ng?e=bfmWBx) (4 files) and put it under `data/`
    
 3. Install required packages
 ```bash
