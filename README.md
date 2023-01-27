@@ -5,13 +5,15 @@ A paradigm of spatial information retrieval and visualization using Object Summa
 ## Setting Up
 
 
-Clone the project
+1. Clone the project
 ```bash
   git clone https://github.com/brigittas/mastersproject.git
   cd mastersproject
 ```
 
-Install required packages
+2. Download test data (4 files) and put it under `data/`
+   
+3. Install required packages
 ```bash
   pip install -r requirements.txt
 ```
